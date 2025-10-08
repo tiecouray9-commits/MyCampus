@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl,Image } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { fetchNews } from '../services/newsService';
 
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -41,6 +41,7 @@ export default function NewsScreen({ navigation }: NewsScreenProps) {
     
     try {
       const data = await fetchNews();
+      console.log('News data:', data); // 🔍 Debug: voir les données
       setItems(data);
     } catch (err) {
       setError(true);
@@ -67,13 +68,47 @@ export default function NewsScreen({ navigation }: NewsScreenProps) {
   const renderItem = ({ item }: { item: NewsItem }) => (
     <TouchableOpacity 
       onPress={() => navigation.navigate('NewsDetail', { id: item.id })} 
-      style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' }}
+      style={{ 
+        padding: 16, 
+        borderBottomWidth: 1, 
+        borderBottomColor: '#eee',
+        backgroundColor: '#fff'
+      }}
     >
+      {item.image ? (
         <Image 
-          source={{ uri: item.image || 'https://via.placeholder.com/150' }} 
-          style={{ width: '100%', height: 150, marginBottom: 8 }} 
-          resizeMode="cover" 
+          source={{ uri: item.image }} 
+          style={{ 
+            width: '100%', 
+            height: 150, 
+            marginBottom: 8,
+            borderRadius: 8,
+            backgroundColor: '#f0f0f0' // Placeholder pendant le chargement
+          }} 
+          resizeMode="cover"
+          onError={(error) => {
+            console.log('Erreur de chargement image:', item.image, error.nativeEvent.error);
+          }}
+          onLoad={() => {
+            console.log('Image chargée avec succès:', item.image);
+          }}
         />
+      ) : (
+        <View 
+          style={{ 
+            width: '100%', 
+            height: 150, 
+            marginBottom: 8,
+            borderRadius: 8,
+            backgroundColor: '#f0f0f0',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          <Text style={{ color: '#999' }}>📷 Pas d'image</Text>
+        </View>
+      )}
+      
       <Text style={{ fontWeight: '600', fontSize: 16, marginBottom: 4 }}>
         {item.title}
       </Text>
