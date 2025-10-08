@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, Image, ActivityIndicator, Alert } from 'react-native';
+import { ScrollView, View, Text, Image, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { fetchNewsById } from '../services/newsService';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -41,40 +41,141 @@ export default function NewsDetail({ route }: Props) {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#26348B" />
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Chargement de l'actualité...</Text>
       </View>
     );
   }
 
   if (!news) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text>Aucune actualité trouvée.</Text>
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorTitle}>Oups !</Text>
+        <Text style={styles.errorText}>Aucune actualité trouvée.</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
+    <ScrollView style={styles.container}>
       {news.image && (
         <Image 
           source={{ uri: news.image }} 
-          style={{ width: '100%', height: 220 }} 
+          style={styles.newsImage} 
           resizeMode="cover" 
         />
       )}
-      <View style={{ padding: 16 }}>
-        <Text style={{ fontSize: 22, fontWeight: '700', marginBottom: 8 }}>
+      <View style={styles.contentContainer}>
+        <Text style={styles.newsTitle}>
           {news.title}
         </Text>
-        <Text style={{ fontSize: 13, color: '#777', marginBottom: 12 }}>
-          {new Date(news.created_at).toLocaleString('fr-FR')}
+        
+        <View style={styles.dateContainer}>
+          <View style={styles.dateBadge}>
+            <Text style={styles.dateText}>
+              {new Date(news.created_at).toLocaleString('fr-FR')}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.newsSummary}>
+          {news.summary}
         </Text>
-        <Text style={{ fontSize: 16, lineHeight: 24, color: '#333' }}>
+
+        <View style={styles.contentDivider} />
+
+        <Text style={styles.newsContent}>
           {news.content}
         </Text>
       </View>
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#F8F9FA',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#7F8C8D',
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#7F8C8D',
+    textAlign: 'center',
+  },
+  newsImage: {
+    width: '100%',
+    height: 220,
+  },
+  contentContainer: {
+    backgroundColor: '#FFFFFF',
+    margin: 16,
+    padding: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  newsTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: 12,
+    lineHeight: 30,
+  },
+  dateContainer: {
+    marginBottom: 16,
+  },
+  dateBadge: {
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  newsSummary: {
+    fontSize: 16,
+    color: '#7F8C8D',
+    lineHeight: 22,
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
+  contentDivider: {
+    height: 1,
+    backgroundColor: '#ECF0F1',
+    marginBottom: 16,
+  },
+  newsContent: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#2C3E50',
+  },
+});

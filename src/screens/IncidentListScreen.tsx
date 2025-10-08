@@ -1,301 +1,299 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, Text, Image, FlatList, StyleSheet, TouchableOpacity, Alert, ActivityIndicator 
-} from 'react-native';
-import * as SQLite from 'expo-sqlite';
+import React, { useEffect, useState } from "react";
+import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
+import * as SQLite from "expo-sqlite";
 
 interface Incident {
   id: number;
-  title: string;
-  description: string;
-  media: string;
+  mediaUri: string;
   latitude: number;
   longitude: number;
-  created_at: string;
+  description: string;
+  date: string;
 }
 
-export default function IncidentListScreen() {
+const IncidentListScreen = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [db, setDb] = useState<SQLite.SQLiteDatabase | null>(null);
-  const [loading, setLoading] = useState(true);
 
+  // 🔹 Initialiser la base de données
   useEffect(() => {
     const initDatabase = async () => {
       try {
-        const database = await SQLite.openDatabaseAsync('incidents.db');
+        const database = await SQLite.openDatabaseAsync("incidents.db");
         setDb(database);
-
-        // Créer la table si elle n'existe pas
-        await database.execAsync(`
-          CREATE TABLE IF NOT EXISTS incidents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            media TEXT,
-            latitude REAL,
-            longitude REAL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-          );
-        `);
-
-        console.log('✅ Base de données initialisée');
-        await fetchIncidents(database);
       } catch (error) {
-        console.error('Erreur initialisation DB:', error);
-        Alert.alert('Erreur', 'Impossible d\'initialiser la base de données.');
-        setLoading(false);
+        console.error("Erreur d'initialisation de la base de données :", error);
+        Alert.alert("Erreur", "Impossible d'initialiser la base de données.");
       }
     };
 
     initDatabase();
   }, []);
 
-  const fetchIncidents = async (database?: SQLite.SQLiteDatabase) => {
-    const dbToUse = database || db;
-    if (!dbToUse) return;
+  // 🔹 Charger les incidents quand la base de données est prête
+  useEffect(() => {
+    if (db) {
+      fetchIncidents();
+    }
+  }, [db]);
+
+  const fetchIncidents = async () => {
+    if (!db) return;
 
     try {
-      setLoading(true);
-      const result = await dbToUse.getAllAsync<Incident>(
-        'SELECT * FROM incidents ORDER BY id DESC'
-      );
+      const result = await db.getAllAsync<Incident>("SELECT * FROM incidents ORDER BY id DESC");
       setIncidents(result);
-      console.log(`✅ ${result.length} incidents chargés`);
     } catch (error) {
-      console.error('Erreur chargement incidents:', error);
-      Alert.alert('Erreur', 'Impossible de charger les incidents.');
-    } finally {
-      setLoading(false);
+      console.error("Erreur lors du chargement :", error);
+      Alert.alert("Erreur", "Impossible de charger les incidents.");
     }
   };
 
+  // 🔹 Supprimer un incident
   const deleteIncident = (id: number) => {
-    Alert.alert('Confirmation', 'Supprimer définitivement cet incident ?', [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert("Confirmation", "Voulez-vous vraiment supprimer cet incident ?", [
+      { text: "Annuler", style: "cancel" },
       {
-        text: 'Supprimer',
-        style: 'destructive',
+        text: "Supprimer",
+        style: "destructive",
         onPress: async () => {
           if (!db) return;
 
           try {
-            await db.runAsync('DELETE FROM incidents WHERE id = ?', [id]);
-            console.log(`✅ Incident ${id} supprimé`);
-            Alert.alert('Succès', 'Incident supprimé avec succès.');
+            await db.runAsync("DELETE FROM incidents WHERE id = ?", [id]);
             await fetchIncidents();
           } catch (error) {
-            console.error('Erreur suppression:', error);
-            Alert.alert('Erreur', 'Impossible de supprimer l\'incident.');
+            console.error("Erreur lors de la suppression :", error);
+            Alert.alert("Erreur", "Impossible de supprimer l'incident.");
           }
         },
       },
     ]);
   };
 
+  // 🔹 Afficher un item
   const renderItem = ({ item }: { item: Incident }) => (
     <View style={styles.card}>
-      {item.media && (item.media.endsWith('.mp4') || item.media.includes('video')) ? (
-        <View style={styles.videoPreview}>
-          <Text style={styles.videoText}>🎥 Vidéo</Text>
-        </View>
-      ) : item.media ? (
-        <Image source={{ uri: item.media }} style={styles.image} />
-      ) : (
-        <View style={styles.noMedia}>
-          <Text style={styles.noMediaText}>📷</Text>
-        </View>
-      )}
-
-      <View style={styles.info}>
-        <Text style={styles.title}>{item.title || 'Incident sans titre'}</Text>
-        <Text style={styles.desc} numberOfLines={2}>
-          {item.description || 'Aucune description fournie.'}
-        </Text>
-
-        <View style={styles.meta}>
-          <Text style={styles.coords}>
-            📍 {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
-          </Text>
+      {/* En-tête de la carte */}
+      <View style={styles.cardHeader}>
+        <View style={styles.dateContainer}>
+          <Ionicons name="time-outline" size={16} color="#7F8C8D" />
           <Text style={styles.date}>
-            🕒 {new Date(item.created_at).toLocaleString('fr-FR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
+            {new Date(item.date).toLocaleString('fr-FR')}
           </Text>
         </View>
-
-        <TouchableOpacity 
-          style={styles.deleteButton} 
+        <TouchableOpacity
+          style={styles.deleteButton}
           onPress={() => deleteIncident(item.id)}
         >
-          <Text style={styles.deleteText}>Supprimer</Text>
+          <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
         </TouchableOpacity>
+      </View>
+
+      {/* Contenu principal */}
+      <View style={styles.cardContent}>
+        {/* Média */}
+        <View style={styles.mediaContainer}>
+          {item.mediaUri.endsWith(".mp4") ? (
+            <View style={styles.videoContainer}>
+              <Ionicons name="videocam" size={32} color="#4CAF50" />
+              <Text style={styles.videoText}>Vidéo</Text>
+            </View>
+          ) : (
+            <Image source={{ uri: item.mediaUri }} style={styles.image} />
+          )}
+        </View>
+
+        {/* Informations */}
+        <View style={styles.infoContainer}>
+          <Text style={styles.description}>
+            {item.description || "Aucune description"}
+          </Text>
+          
+          <View style={styles.locationContainer}>
+            <Ionicons name="location-outline" size={14} color="#4CAF50" />
+            <Text style={styles.coordinates}>
+              {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)}
+            </Text>
+          </View>
+
+          <View style={styles.idContainer}>
+            <Text style={styles.idText}>ID: #{item.id}</Text>
+          </View>
+        </View>
       </View>
     </View>
   );
-
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#26348B" />
-        <Text style={styles.loadingText}>Chargement des incidents...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>📋 Incidents enregistrés</Text>
-
       {incidents.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📭</Text>
-          <Text style={styles.emptyText}>Aucun incident enregistré pour le moment.</Text>
-          <Text style={styles.emptySubText}>
-            Les incidents signalés apparaîtront ici.
+          <Ionicons name="document-outline" size={64} color="#CCCCCC" />
+          <Text style={styles.emptyTitle}>Aucun incident</Text>
+          <Text style={styles.emptyText}>
+            Les incidents que vous signalez apparaîtront ici
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={incidents}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          <View style={styles.header}>
+            <Text style={styles.title}>Incidents enregistrés</Text>
+            <Text style={styles.subtitle}>
+              {incidents.length} incident{incidents.length > 1 ? 's' : ''} au total
+            </Text>
+          </View>
+          
+          <FlatList
+            data={incidents}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+          />
+        </>
       )}
     </View>
   );
-}
+};
+
+export default IncidentListScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 16,
-    paddingTop: 20,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#6B7280',
-    fontSize: 14,
+    backgroundColor: "#F8F9FA",
   },
   header: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    marginBottom: 16,
-    flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
-    overflow: 'hidden',
-  },
-  image: {
-    width: 110,
-    height: 110,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-  },
-  videoPreview: {
-    width: 110,
-    height: 110,
-    backgroundColor: '#E0E7FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoText: {
-    color: '#26348B',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  noMedia: {
-    width: 110,
-    height: 110,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noMediaText: {
-    fontSize: 32,
-    opacity: 0.3,
-  },
-  info: {
-    flex: 1,
-    padding: 12,
+    backgroundColor: "#FFFFFF",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECF0F1",
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#2C3E50",
     marginBottom: 4,
   },
-  desc: {
+  subtitle: {
     fontSize: 14,
-    color: '#475569',
-    marginTop: 4,
-    lineHeight: 18,
+    color: "#7F8C8D",
   },
-  meta: {
-    marginTop: 8,
+  listContainer: {
+    padding: 16,
   },
-  coords: {
-    fontSize: 12,
-    color: '#64748B',
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  dateContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   date: {
     fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
+    color: "#7F8C8D",
+    fontWeight: "500",
   },
   deleteButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginTop: 10,
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: "rgba(255, 107, 107, 0.1)",
   },
-  deleteText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 13,
+  cardContent: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  mediaContainer: {
+    width: 80,
+    height: 80,
+  },
+  image: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  videoContainer: {
+    width: 80,
+    height: 80,
+    backgroundColor: "#E8F5E8",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 4,
+  },
+  videoText: {
+    fontSize: 12,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
+  infoContainer: {
+    flex: 1,
+    gap: 8,
+  },
+  description: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    lineHeight: 20,
+  },
+  locationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  coordinates: {
+    fontSize: 12,
+    color: "#7F8C8D",
+  },
+  idContainer: {
+    alignSelf: "flex-start",
+    backgroundColor: "#ECF0F1",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  idText: {
+    fontSize: 10,
+    color: "#7F8C8D",
+    fontWeight: "500",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyText: {
-    color: '#374151',
-    fontSize: 16,
-    textAlign: 'center',
-    fontWeight: '600',
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginTop: 16,
     marginBottom: 8,
   },
-  emptySubText: {
-    color: '#9CA3AF',
+  emptyText: {
     fontSize: 14,
-    textAlign: 'center',
+    color: "#7F8C8D",
+    textAlign: "center",
+    lineHeight: 20,
   },
 });

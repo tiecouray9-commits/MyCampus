@@ -1,129 +1,198 @@
-import React from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Linking,
-  Alert,
+import React from 'react';
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  TouchableOpacity, 
+  Linking, 
+  Alert, 
   StyleSheet,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+  SafeAreaView 
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const contacts = [
-  { id: "1", name: "Scolarité", phone: "+225012345678" },
-  { id: "2", name: "Sécurité", phone: "+225065432100" },
-  { id: "3", name: "Infirmier de d'école", phone: "+225070000111" },
-  { id: "4", name: "Direction Pédagogique", phone: "+225050303030" },
+  { 
+    id: '1', 
+    name: 'Scolarité', 
+    phone: '+2250507265810',
+    icon: 'school-outline',
+    color: '#4CAF50'
+  },
+  { 
+    id: '2', 
+    name: 'Sécurité', 
+    phone: '+2250706744270',
+    icon: 'shield-checkmark-outline',
+    color: '#FF6B6B'
+  },
 ];
 
 export default function ContactsScreen() {
   const call = async (phone: string) => {
     const url = `tel:${phone}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) Linking.openURL(url);
-    else Alert.alert("Impossible", "Appel non supporté sur cet appareil.");
+    const ok = await Linking.canOpenURL(url);
+    if (ok) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert('Impossible', 'Appel non supporté sur cet appareil');
+    }
   };
 
   const sms = async (phone: string) => {
     const url = `sms:${phone}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) Linking.openURL(url);
-    else Alert.alert("Impossible", "SMS non supporté sur cet appareil.");
+    const ok = await Linking.canOpenURL(url);
+    if (ok) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert('Impossible', 'SMS non supporté sur cet appareil');
+    }
   };
 
-  const renderItem = ({ item }: any) => (
-    <View style={styles.card}>
-      <View style={styles.info}>
-        <Ionicons name="person-circle-outline" size={36} color="#26348B" />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.phone}>{item.phone}</Text>
+  const renderContactItem = ({ item }) => (
+    <View style={styles.contactCard}>
+      {/* En-tête du contact */}
+      <View style={styles.contactHeader}>
+        <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
+          <Ionicons name={item.icon} size={24} color="white" />
+        </View>
+        <View style={styles.contactInfo}>
+          <Text style={styles.contactName}>{item.name}</Text>
+          <Text style={styles.phoneNumber}>{item.phone}</Text>
         </View>
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#22C55E" }]} onPress={() => call(item.phone)}>
-          <Ionicons name="call" size={18} color="#fff" />
-          <Text style={styles.actionText}>Appeler</Text>
+      {/* Actions */}
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.callButton]} 
+          onPress={() => call(item.phone)}
+        >
+          <Ionicons name="call-outline" size={20} color="white" />
+          <Text style={styles.actionButtonText}>Appeler</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#3B82F6" }]} onPress={() => sms(item.phone)}>
-          <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
-          <Text style={styles.actionText}>SMS</Text>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.smsButton]} 
+          onPress={() => sms(item.phone)}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color="white" />
+          <Text style={styles.actionButtonText}>SMS</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>📞 Contacts utiles du campus</Text>
+    <SafeAreaView style={styles.container}>
+      {/* En-tête de la page */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Contacts d'urgence</Text>
+        <Text style={styles.headerSubtitle}>
+          Contactez rapidement les services disponibles
+        </Text>
+      </View>
+
+      {/* Liste des contacts */}
       <FlatList
         data={contacts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 30 }}
+        keyExtractor={item => item.id}
+        renderItem={renderContactItem}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-    padding: 16,
+    backgroundColor: '#F8F9FA',
   },
   header: {
-    fontSize: 22,
-    fontWeight: "700",
-    textAlign: "center",
-    color: "#111827",
+    padding: 20,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9ECEF',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#7F8C8D',
+  },
+  listContainer: {
+    padding: 16,
+  },
+  contactCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  contactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 5,
-    elevation: 3,
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
-  info: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-    gap: 10,
+  contactInfo: {
+    flex: 1,
   },
-  name: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#1E293B",
+  contactName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 4,
   },
-  phone: {
-    color: "#64748B",
+  phoneNumber: {
     fontSize: 14,
+    color: '#7F8C8D',
   },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
+  actionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
   },
-  actionText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 13,
+  callButton: {
+    backgroundColor: '#4CAF50',
+  },
+  smsButton: {
+    backgroundColor: '#2196F3',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });

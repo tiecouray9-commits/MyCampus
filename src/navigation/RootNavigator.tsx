@@ -1,52 +1,58 @@
-import React from "react";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons } from "@expo/vector-icons";
-import NewsStack from "./NewsStack";
-import ContactsScreen from "../screens/ContactsScreen";
-import MapScreen from "../screens/MapScreen";
-import IncidentStack from "./IncidentStack";
+import React from 'react';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons'; // ou une autre librairie d'icônes
+import NewsStack from './NewsStack';
+import ContactsScreen from '../screens/ContactsScreen';
+import MapScreen from '../screens/MapScreen';
+import IncidentStack from './IncidentStack';
 
 const Tab = createBottomTabNavigator();
 
 export default function RootNavigator() {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
+    <Tab.Navigator 
+      screenOptions={{ 
         headerShown: false,
-        tabBarActiveTintColor: "#26348B",
-        tabBarInactiveTintColor: "#777",
-        tabBarStyle: {
-          backgroundColor: "#fff",
-          borderTopColor: "#eee",
-          height: 60,
-          paddingBottom: 5,
-        },
-        tabBarIcon: ({ color, size, focused }) => {
-          let iconName: string = "";
-
-          switch (route.name) {
-            case "Actualités":
-              iconName = focused ? "newspaper" : "newspaper-outline";
-              break;
-            case "Contacts":
-              iconName = focused ? "people" : "people-outline";
-              break;
-            case "Carte":
-              iconName = focused ? "map" : "map-outline";
-              break;
-            case "Déclarer":
-              iconName = focused ? "alert-circle" : "alert-circle-outline";
-              break;
-          }
-
-          return <Ionicons name={iconName as any} size={size} color={color} />;
-        },
-      })}
+        tabBarActiveTintColor: '#007AFF', // Couleur quand l'onglet est actif
+        tabBarInactiveTintColor: 'gray', // Couleur quand l'onglet est inactif
+      }}
     >
-      <Tab.Screen name="Actualités" component={NewsStack} />
-      <Tab.Screen name="Contacts" component={ContactsScreen} />
-      <Tab.Screen name="Carte" component={MapScreen} />
-      <Tab.Screen name="Déclarer" component={IncidentStack} />
+      <Tab.Screen 
+        name="Actualités" 
+        component={NewsStack}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="newspaper-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Contacts" 
+        component={ContactsScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Carte" 
+        component={MapScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="map-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Déclarer" 
+        component={IncidentStack}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="warning-outline" size={size} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }

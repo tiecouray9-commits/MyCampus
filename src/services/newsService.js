@@ -1,11 +1,13 @@
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.52:3000/news';
+// ⚠️ Mets ici ton IP locale si tu testes sur Expo Go
+const API_URL = 'http://192.168.56.1:3000/news';
 
 export const fetchNews = async (page = 1, limit = 5) => {
   try {
-
-    const response = await axios.get(API_URL,{ timeout: 100000 });
+    // Ton API Express ne gère pas la pagination, donc on ignore les params
+    // et on retourne toutes les news
+    const response = await axios.get(API_URL);
 
     if (response.status === 200) {
       return response.data;

@@ -1,418 +1,500 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, Text, TextInput, TouchableOpacity, Image, 
-  StyleSheet, ScrollView, Alert, ActivityIndicator 
-} from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
-import * as SQLite from 'expo-sqlite';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import React, { useState, useEffect } from "react";
+import { View, Text, Image, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, Linking } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import * as SQLite from "expo-sqlite";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-// Type pour toutes les routes de votre navigation
 type RootStackParamList = {
-  'Incidents enregistrés': undefined;
+  "Incidents enregistrés": undefined;
   NewsDetail: { id: number };
-  // Ajoutez les autres écrans si nécessaire
 };
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Incidents enregistrés'>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Incidents enregistrés">;
 
-export default function IncidentScreen() {
+const IncidentScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [media, setMedia] = useState<string | null>(null);
+  const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [address, setAddress] = useState<string>("");
+  const [description, setDescription] = useState("");
   const [db, setDb] = useState<SQLite.SQLiteDatabase | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
 
-  // Initialisation de la base de données
+  // 🔹 Initialisation de la base de données
   useEffect(() => {
     const initDatabase = async () => {
       try {
-        const database = await SQLite.openDatabaseAsync('incidents.db');
+        const database = await SQLite.openDatabaseAsync("incidents.db");
         setDb(database);
 
-        // Créer la table avec la bonne structure
         await database.execAsync(`
           CREATE TABLE IF NOT EXISTS incidents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            media TEXT,
+            mediaUri TEXT,
             latitude REAL,
             longitude REAL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            description TEXT,
+            date TEXT
           );
         `);
-
-        console.log('✅ Base de données initialisée avec succès');
       } catch (error) {
-        console.error('Erreur lors de l\'initialisation de la BD:', error);
-        Alert.alert('Erreur', 'Impossible d\'initialiser la base de données.');
+        console.error("Erreur d'initialisation de la base de données :", error);
+        Alert.alert("Erreur", "Impossible d'initialiser la base de données.");
       }
     };
 
     initDatabase();
   }, []);
 
-  // Récupération de la position
-  useEffect(() => {
-    const getLocation = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission refusée', 'La localisation est nécessaire.');
-          return;
-        }
-        
-        const loc = await Location.getCurrentPositionAsync({});
-        setLocation({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-        });
-      } catch (error) {
-        console.error('Erreur de localisation:', error);
-        Alert.alert('Erreur', 'Impossible de récupérer votre position.');
-      }
-    };
-
-    getLocation();
-  }, []);
-
-  const pickMedia = async () => {
+  // 🔹 Fonction pour récupérer l'adresse à partir des coordonnées
+  const getAddressFromCoords = async (lat: number, lon: number) => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
-        quality: 0.8,
-        allowsEditing: true,
+      const addressResponse = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lon,
       });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setMedia(result.assets[0].uri);
+      
+      if (addressResponse.length > 0) {
+        const addr = addressResponse[0];
+        const addressParts = [
+          addr.name,
+          addr.street,
+          addr.postalCode,
+          addr.city,
+          addr.region,
+          addr.country
+        ].filter(part => part).join(', ');
+        
+        setAddress(addressParts || "Adresse non disponible");
       }
     } catch (error) {
-      console.error('Erreur de sélection média:', error);
-      Alert.alert('Erreur', 'Impossible de sélectionner le média.');
+      console.error("Erreur géocodage inverse:", error);
+      setAddress("Adresse non disponible");
     }
   };
 
-  const saveIncident = async () => {
-    if (!title.trim() || !description.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir le titre et la description.');
-      return;
-    }
+  // 🔹 Fonction pour récupérer la position
+  const getLocation = async () => {
+    setGettingLocation(true);
+    
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission refusée", "Impossible d'accéder à la localisation.");
+        return;
+      }
 
-    if (!location) {
-      Alert.alert('Erreur', 'Localisation non disponible.');
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.BestForNavigation,
+      });
+      
+      const newLocation = {
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      };
+      
+      setLocation(newLocation);
+      await getAddressFromCoords(newLocation.latitude, newLocation.longitude);
+      
+    } catch (error) {
+      console.error("Erreur localisation:", error);
+      Alert.alert("Erreur", "Impossible d'obtenir la localisation.");
+    } finally {
+      setGettingLocation(false);
+    }
+  };
+
+  // 🔹 Ouvrir la localisation dans Maps
+  const openInMaps = () => {
+    if (!location) return;
+    
+    const url = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+    Linking.openURL(url).catch(err => 
+      Alert.alert("Erreur", "Impossible d'ouvrir la carte.")
+    );
+  };
+
+  // 🔹 Fonction pour choisir un média (photo ou vidéo)
+  const pickMedia = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setMediaUri(result.assets[0].uri);
+    }
+  };
+
+  // 🔹 Enregistrement local dans SQLite
+  const saveIncident = async () => {
+    if (!mediaUri || !location) {
+      Alert.alert("Erreur", "Veuillez ajouter un média et activer la localisation.");
       return;
     }
 
     if (!db) {
-      Alert.alert('Erreur', 'Base de données non initialisée.');
+      Alert.alert("Erreur", "Base de données non initialisée.");
       return;
     }
 
-    setLoading(true);
+    const date = new Date().toISOString();
 
     try {
-      const result = await db.runAsync(
-        'INSERT INTO incidents (title, description, media, latitude, longitude, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))',
-        [title, description, media || '', location.latitude, location.longitude]
+      await db.runAsync(
+        "INSERT INTO incidents (mediaUri, latitude, longitude, description, date) VALUES (?, ?, ?, ?, ?)",
+        [mediaUri, location.latitude, location.longitude, description, date]
       );
 
-      console.log('✅ Incident enregistré avec l\'ID:', result.lastInsertRowId);
-      
-      Alert.alert('Succès', 'Incident enregistré localement ✅');
-      
-      // Réinitialiser le formulaire
-      setTitle('');
-      setDescription('');
-      setMedia(null);
+      Alert.alert("Succès", "Incident enregistré localement !");
+      setMediaUri(null);
+      setDescription("");
+      setLocation(null);
+      setAddress("");
     } catch (error) {
-      console.error('Erreur SQL lors de l\'insertion:', error);
-      Alert.alert('Erreur', 'Impossible d\'enregistrer l\'incident.');
-    } finally {
-      setLoading(false);
+      console.error("Erreur SQLite :", error);
+      Alert.alert("Erreur", "Échec de l'enregistrement local.");
     }
   };
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      contentContainerStyle={{ paddingBottom: 40 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text style={styles.header}>Signaler un incident</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Signaler un Incident</Text>
+        <Text style={styles.subtitle}>
+          Documentez un problème sur le campus
+        </Text>
+      </View>
 
-      {/* Carte */}
-      {location ? (
-        <MapView
-          style={styles.map}
-          initialRegion={{
-            latitude: location.latitude,
-            longitude: location.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
+      {/* Section Média */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Média</Text>
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={pickMedia}
+          activeOpacity={0.7}
         >
-          <Marker coordinate={location} title="Votre position actuelle" />
-        </MapView>
-      ) : (
-        <View style={[styles.map, styles.mapPlaceholder]}>
-          <ActivityIndicator size="large" color="#26348B" />
-          <Text style={styles.mapPlaceholderText}>Chargement de la carte...</Text>
-        </View>
-      )}
-
-      {/* Formulaire */}
-      <View style={styles.form}>
-        <Text style={styles.label}>Titre *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ex: Incendie, panne, accident..."
-          value={title}
-          onChangeText={setTitle}
-        />
-
-        <Text style={styles.label}>Description *</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          multiline
-          placeholder="Décrivez l'incident..."
-          value={description}
-          onChangeText={setDescription}
-        />
-
-        {/* Média */}
-        <Text style={styles.label}>Photo ou vidéo (optionnel)</Text>
-        <TouchableOpacity style={styles.mediaButton} onPress={pickMedia}>
-          <Text style={styles.mediaButtonText}>
-            {media ? '✓ Média sélectionné - Changer' : '📷 Ajouter une photo ou une vidéo'}
-          </Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="camera" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Choisir un média</Text>
+          </View>
         </TouchableOpacity>
 
-        {/* Prévisualisation */}
-        {media && (
+        {mediaUri && (
           <View style={styles.previewContainer}>
-            {media.endsWith('.mp4') || media.includes('video') ? (
+            {mediaUri.endsWith(".mp4") || mediaUri.includes("video") ? (
               <View style={styles.videoPreview}>
-                <Text style={styles.videoPreviewText}>🎥 Vidéo sélectionnée</Text>
+                <Ionicons name="videocam" size={40} color="#4CAF50" />
+                <Text style={styles.previewText}>Vidéo sélectionnée</Text>
               </View>
             ) : (
-              <Image source={{ uri: media }} style={styles.previewImage} />
+              <Image source={{ uri: mediaUri }} style={styles.previewImage} />
             )}
+          </View>
+        )}
+      </View>
+
+      {/* Section Localisation */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Localisation</Text>
+        <TouchableOpacity 
+          style={[styles.button, gettingLocation && styles.disabledButton]} 
+          onPress={getLocation}
+          activeOpacity={0.7}
+          disabled={gettingLocation}
+        >
+          <View style={styles.buttonContent}>
+            {gettingLocation ? (
+              <Ionicons name="location" size={20} color="#FFFFFF" />
+            ) : (
+              <Ionicons name="location" size={20} color="#FFFFFF" />
+            )}
+            <Text style={styles.buttonText}>
+              {gettingLocation ? "Obtention de la position..." : "Obtenir la position"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {location && (
+          <View style={styles.locationPreview}>
+            <View style={styles.locationHeader}>
+              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+              <Text style={styles.locationTitle}>Position obtenue</Text>
+            </View>
+            
+            <View style={styles.coordinatesContainer}>
+              <View style={styles.coordRow}>
+                <Ionicons name="latitude" size={14} color="#7F8C8D" />
+                <Text style={styles.coordLabel}>Latitude:</Text>
+                <Text style={styles.coordValue}>{location.latitude.toFixed(6)}</Text>
+              </View>
+              
+              <View style={styles.coordRow}>
+                <Ionicons name="longitude" size={14} color="#7F8C8D" />
+                <Text style={styles.coordLabel}>Longitude:</Text>
+                <Text style={styles.coordValue}>{location.longitude.toFixed(6)}</Text>
+              </View>
+            </View>
+
+            {address && (
+              <View style={styles.addressContainer}>
+                <Ionicons name="navigate" size={14} color="#4CAF50" />
+                <Text style={styles.addressText} numberOfLines={2}>{address}</Text>
+              </View>
+            )}
+
             <TouchableOpacity 
-              style={styles.removeMediaButton} 
-              onPress={() => setMedia(null)}
+              style={styles.mapButton}
+              onPress={openInMaps}
+              activeOpacity={0.7}
             >
-              <Text style={styles.removeMediaText}>✕ Retirer</Text>
+              <View style={styles.mapButtonContent}>
+                <Ionicons name="map" size={16} color="#4CAF50" />
+                <Text style={styles.mapButtonText}>Voir sur la carte</Text>
+              </View>
             </TouchableOpacity>
           </View>
         )}
+      </View>
 
-        {/* Info localisation */}
-        {location && (
-          <View style={styles.locationInfo}>
-            <Text style={styles.locationLabel}>📍 Position GPS</Text>
-            <Text style={styles.locationText}>
-              Lat: {location.latitude.toFixed(6)}, Long: {location.longitude.toFixed(6)}
+      {/* Section Description */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Description</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Décrivez l'incident (optionnel)"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+      </View>
+
+      {/* Boutons d'action */}
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity 
+          style={[styles.button, styles.primaryButton]} 
+          onPress={saveIncident}
+          activeOpacity={0.7}
+        >
+          <View style={styles.buttonContent}>
+            <Ionicons name="save" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Enregistrer l'incident</Text>
+          </View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Incidents enregistrés")}
+          style={[styles.button, styles.secondaryButton]}
+          activeOpacity={0.7}
+        >
+          <View style={styles.buttonContent}>
+            <Ionicons name="list" size={20} color="#4CAF50" />
+            <Text style={[styles.buttonText, styles.secondaryButtonText]}>
+              Voir les incidents
             </Text>
           </View>
-        )}
-
-        {/* Bouton d'enregistrement */}
-        <TouchableOpacity 
-          style={[
-            styles.submitButton, 
-            (loading || !title.trim() || !description.trim() || !location) && styles.submitButtonDisabled
-          ]} 
-          onPress={saveIncident}
-          disabled={loading || !title.trim() || !description.trim() || !location}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitText}>Enregistrer l'incident</Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Bouton pour voir les incidents */}
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Incidents enregistrés')}
-          style={styles.viewButton}
-        >
-          <Text style={styles.viewButtonText}>Voir les incidents enregistrés</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
   );
-}
+};
 
-// --- Styles modernes ---
+export default IncidentScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 16,
+    backgroundColor: "#F8F9FA",
+  },
+  contentContainer: {
+    padding: 20,
   },
   header: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-    marginVertical: 20,
+    marginBottom: 30,
   },
-  map: {
-    height: 200,
-    borderRadius: 15,
-    marginBottom: 20,
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    textAlign: "center",
+    marginBottom: 8,
   },
-  mapPlaceholder: {
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
+  subtitle: {
+    fontSize: 16,
+    color: "#7F8C8D",
+    textAlign: "center",
   },
-  mapPlaceholderText: {
-    marginTop: 10,
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  form: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
+  section: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
     padding: 20,
-    shadowColor: '#000',
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3.84,
     elevation: 5,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 6,
-    color: '#374151',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 12,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  button: {
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 15,
-    fontSize: 14,
-    backgroundColor: '#F9FAFB',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    shadowColor: "#4CAF50",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  textArea: {
-    height: 90,
-    textAlignVertical: 'top',
+  disabledButton: {
+    opacity: 0.6,
   },
-  mediaButton: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    borderStyle: 'dashed',
+  primaryButton: {
+    backgroundColor: "#4CAF50",
   },
-  mediaButtonText: {
-    color: '#26348B',
-    fontWeight: '600',
+  secondaryButton: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#4CAF50",
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  secondaryButtonText: {
+    color: "#4CAF50",
   },
   previewContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-    position: 'relative',
+    marginTop: 12,
+    alignItems: "center",
   },
   previewImage: {
-    width: '100%',
+    width: 200,
     height: 200,
     borderRadius: 12,
   },
   videoPreview: {
-    width: '100%',
-    height: 200,
+    width: 200,
+    height: 120,
+    backgroundColor: "#E8F5E8",
     borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#26348B',
-    borderStyle: 'dashed',
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
   },
-  videoPreviewText: {
-    fontSize: 18,
-    color: '#26348B',
-    fontWeight: '600',
+  previewText: {
+    fontSize: 14,
+    color: "#4CAF50",
+    fontWeight: "600",
   },
-  removeMediaButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  locationPreview: {
+    marginTop: 12,
+    padding: 16,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E8F5E8",
   },
-  removeMediaText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  locationInfo: {
-    backgroundColor: '#F0F9FF',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 15,
-    borderLeftWidth: 3,
-    borderLeftColor: '#26348B',
-  },
-  locationLabel: {
-    fontWeight: '600',
-    color: '#1E40AF',
-    marginBottom: 4,
-  },
-  locationText: {
-    color: '#475569',
-    fontSize: 12,
-  },
-  submitButton: {
-    backgroundColor: '#26348B',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
+  locationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     marginBottom: 12,
-    shadowColor: '#26348B',
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 6,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  submitText: {
-    color: '#fff',
-    fontWeight: '700',
+  locationTitle: {
     fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
   },
-  viewButton: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#26348B',
+  coordinatesContainer: {
+    gap: 8,
+    marginBottom: 12,
   },
-  viewButtonText: {
-    color: '#26348B',
-    fontWeight: '700',
-    fontSize: 16,
+  coordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  coordLabel: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    fontWeight: "500",
+    minWidth: 60,
+  },
+  coordValue: {
+    fontSize: 12,
+    color: "#2C3E50",
+    fontWeight: "600",
+    fontFamily: 'monospace',
+  },
+  addressContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: "#E8F5E8",
+    borderRadius: 8,
+  },
+  addressText: {
+    fontSize: 12,
+    color: "#4CAF50",
+    fontWeight: "500",
+    flex: 1,
+  },
+  mapButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: "rgba(76, 175, 80, 0.1)",
+  },
+  mapButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  mapButtonText: {
+    fontSize: 12,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ECF0F1",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: "#2C3E50",
+    backgroundColor: "#F8F9FA",
+    minHeight: 100,
+  },
+  actionsContainer: {
+    gap: 12,
+    marginTop: 8,
   },
 });
